@@ -1,0 +1,334 @@
+---
+title: "Estimation of Rates of Coronavirus Cases in Wisconsin Counties"
+author: Johanna Kopecky
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(tinytex)
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+  opts_chunk$set(fig.align='center')
+library(tidyverse)
+```
+
+
+
+**Abstract**
+
+We compare the rate of positive cases of COVID-19 across the counties of Wisconsin and estimate the mean number of positive cases per 1,000 people in the population. COVID-19 has been affecting the world since December 2019 and has been a large source of concern for health and spreading. Looking at the number of confirmed positive cases in each of Wisconsin's 72 counties, we develop a Bayesian hierarchical model to estimate the mean number of positive cases in Wisconsin per 1,000 people. We find that mean number of cases per 1,000 people is typically higher in higher populated areas and in areas near Chicago, and that counties with a smaller population have a lower rate.
+
+
+\newpage
+
+### Background and Significance
+
+
+The first reported case of an unknown pneumonia-like illness later identified as COVID-19, or "coronavirus" was reported to the World Health Organization from Wuhan, China on 31 December 2019. The virus quickly spread all over the world and was declared a Public Health Emergency of International Concern on 30 January 2020 (WHO, 2020). The first case of coronavirus in the United States was confirmed 21 January 2020 in Washington state and the United States declared its US public health emergency 31 January 2020, following the WHO's declaration (Hauck et al, 2020). The first case of coronavirus in the state of Wisconsin was detected on 24 February 2020 and has increased to 14,396 total cases as of 22 May 2020 (Wisconsin Department of Health Services, 2020)
+
+In this study, we investigate number of positive coronavirus cases in Wisconsin. We seek to estimate the mean number of positive cases per 1,000 people in each county, and to determine whether number of cases per 1,000 people differs between counties. We explore how large and small counties compare with one another, the concentration of cases for counties in and near the Fox Valley, and the relationship between population size and number of cases per 1,000 people.
+
+
+### Data
+
+```{r}
+data <- read.csv("Bayesian_Project_COVID_Data.csv")
+
+Popul <- data$Population %>%
+  str_remove_all("\\,") %>%
+  as.character() %>%
+  as.numeric()
+
+Positive <- data$Postive.Tests
+```
+
+Our data is from the Wisconsin Department of Health Services website, where a full data set is available for download and contains 6,192 variables. We will be working with a subset of the data that works with Wisconsin's 72 counties and has information of the variables of county, number of tests that came back negative, number of tests that came back positive, and the county's population. The data are from results collected between 15 March to 22 May. The test results were obtained from laboratory-confirmed cases of COVID-19m and thus we are certain that the data is representative of all (confirmed) cases in all counties.
+
+All 72 counties have at least one confirmed case of coronavirus, with the most being Milwaukee county with 5,735 cases, followed by Brown County with less than half of that: 2,204 cases. Four counties, Burnett, Langlade, Pepin, and Taylor only have one confirmed case. It is unclear exactly how the data was obtained -- if it was sent by testing facilities or if it was requested and gathered by researchers, but it is comprised of laboratory-confirmed cases. This data was confirmed up-to-date as of 22 May, 2020. As stated above, the dataset we are working with does contain the number of negative test results, but that it not used in this analysis. 
+
+Figure 1 displays the distributions of number of positive cases in each county. We see that the distribution is extremely right-skewed. The mean number of cases is 200 and the median number of cases is 21.5 (22). The maximum number of cases is 5735, which explains the extreme difference between the mean and the median. 
+
+```{r, fig.height=3, fig.width=6, fig.cap="Distribution Radon Levels in Sample of Minnesota Houses"}
+ggplot(data=data, aes(x=Positive)) + geom_histogram(fill="blue", color="white") + xlab("Number of Positive Cases") + ylab("Frequency")
+```
+
+
+### Methods  
+
+We will model number of positive cases per Wisconsin county per 1,000 people using a Bayesian hierarchical model. The hierarchical model is based on the assumption that the number of positive cases per 1,000 people differs across counties, while also allowing for information to be shared across counties. This sharing is especially advantageous for counties with smaller populations. 
+
+Let $y_{ij}$ represent the number of confirmed positive cases in the population, where $i$ indexes counties ($i=1, \ldots, 72$), and $j$ indexes number of cases. Since number of cases are always nonnegative and this is a matter of dealing with counts, we use the data model
+
+\[
+y_{ij}\sim\text{Pois}(\theta_i M_i), 
+\]
+
+where $\theta_i$ represents the expected number of positive cases per 1,0000 people and $\theta_i M_i$ represents the number of cases per 1,000 people with population $M_i$ in county $i$. 
+
+We assign a conjugate prior  
+
+\[
+\theta_i\sim\text{Gamma}(a,b). 
+\]
+
+The gamma prior makes sense, since it takes on only positive values. 
+
+Next, we need to assign distributions for the hyperparameters $a$ and $b$. Since it is more natural to work with a mean and variance parameter, we reparameterize using $mu=a/b$ and $\sigma^2=a/b^2$. We seek vague priors that will be quickly overwhelmed by the data. In this model, $p(\mu)$ represents our prior belief about the mean of the distribution for $\theta$, while $p(\sigma)$ reflects our prior belief about the amount of variability in number of cases between counties. We use priors    
+
+\[
+\mu\sim\text{Ga}(0.1, 0.01) \]
+\[ \sigma\sim\text{Unif}(0,1)
+\]
+
+A simple glance at the dataset for the number of positive cases in each county loosely lends itself to the idea that prior mean of number of cases per thousand people might be 10. This is a very vague, loose, and somewhat unsupported estimate, but that is acceptable because in a pure situation, any prior information would be discouraged anyway. A Uniform(0,1) prior is used on the $\sigma$ due to the fact that we have no prior knowledge about how the data behaves, and thus we will just assume that there is an equal probability of variation between each of the counties and that $\theta_i < 1$ for all $i$.
+
+
+### Results  
+
+
+```{r}
+library(rjags)
+model1 <-"
+model {
+for(j in 1:n){
+y[j] ~ dpois(M[j]*theta[county[j]])
+}
+for (i in 1:numcounty){
+theta[i] ~ dgamma(a,b)
+}
+a <- mean^2/sig^2
+b <- mean/sig^2
+mean ~ dgamma(.1,.01)
+sig ~ dunif(0,1)
+}
+
+"
+dat <- list(M=Popul/1000, y=Positive, n=length(Positive),
+county=(data$County),
+numcounty=nlevels(data$County))
+s <- 1000
+```
+
+```{r, include=FALSE}
+m1 <- jags.model(textConnection(model1), dat)
+r1 = coda.samples(m1, c("theta"), n.iter=s)
+```
+
+
+Figure 2 displays traceplots and posterior densities for $\mu$ and $\sigma$. We see that the posterior density for $\mu$ is roughly symmetric, and a 95% credible interval for $\mu$ is (0.8207, 1.1180). The distribution for $\sigma$ is also roughly symmetric and a 95% credible interval is (0.8088, 0.9966). In each situation, the prior has virtually no impact on the posterior. The posterior for $\sigma$ is somewhat close to the endpoint of the uniform(0,1) prior, but it does not cut off and it begins to decrease before the cut off. 
+
+```{r, fig.cap="Posterior and traceplots"}
+r2 <- coda.samples(m1, c("mean","sig"), n.iter=1000)   #simulate from posterior
+plot(r2)
+```
+
+```{r, include=FALSE}
+r1 = coda.samples(m1, c("theta"), n.iter=s)
+
+County <- levels(data$County)
+Estimate <- summary(r1)[[1]][1:72,1]
+Lower <- summary(r1)[[2]][1:72,1]
+Upper <- summary(r1)[[2]][1:72,5]
+Model <- "Hierarchical"
+df_Covid1 <- data.frame(County, Estimate, Lower, Upper, Model)
+```
+
+Figure 3 displays credible intervals for the mean number of cases per 1,000 people in each county. Counties are arranged from lowest to highest posterior mean. 
+
+```{r, fig.height=10, fig.cap="Credible Intervals for Mean Cases Per 1,000 People"}
+ggplot(df_Covid1, aes(xmin= Lower, xmax = Upper, y = reorder(County, desc(Estimate)), color=Model))+
+geom_linerange(lwd=1, position = position_dodge(.33)) +
+geom_point(aes(x=Estimate, y=County)) +
+labs(x=expression(theta), title='95% Credible Intervals') + theme_bw()
+```
+
+Next, we calculate the posterior probability of the mean number of cases per 1,000 people in one county exceeding that of another county, for six counties in and near the Fox Valley. This area was chosen due the location of Lawrence University in the Fox Valley, as well as my place of residence. These are Outagamie, Winnebago, Calumet, Brown, Waupaca, and Manitowoc. Table 1 displays the matrix of posterior probabilities for the mean number of cases per 1,000 people in the county in a given row exceeding that of a county in a given column. For example, the model estimates about a 50% probability that the mean number of cases per 1,000 people in Outagamie County exceeds that of Winnebago County. We see that among these particular counties in the eastern part of the state, Brown and Calumet Counties are likely to have the highest mean number of cases, Waupaca and Manitowoc have the lowest, and Outagamie and Winnebago are somewhere in between. 
+
+```{r, fig.cap="Table 1: Probability of Mean Number of Positive Cases per 1,000 People in County i Exceeding that of County j."}
+counties <- c(45, 71, 8, 5, 69, 36)
+PostProb <- matrix(rep(NA), nrow=6, ncol=6)
+for(i in 1:6){
+  for (j in 1:6)
+    PostProb[i,j] <- mean(unlist(r1[,counties[i]])>unlist(r1[,counties[j]]))
+}
+row.names(PostProb) <- c("Outagamie", "Winnebago", "Calumet", "Brown", "Waupaca", "Manitowoc")
+colnames(PostProb) <- c("Outagamie", "Winnebago", "Calumet", "Brown", "Waupaca", "Manitowoc")
+kable(PostProb, caption = "Probability of Mean Cases per 1,000 in County i Exceeding that of County j.")
+```
+
+
+In order to assess the model, we perform a posterior predictive model check. We simulate 1,000 datasets of 72 houses from the corresponding counties, using the posterior predictive distribution. In the actual data, the standard deviation of number of cases across counties was 737.3387. We use this as a posterior predictive test statistic. Figure 4 displays the value of this test statistic relative to those calculated in the data simulated from the posterior predictive distribution.
+
+```{r}
+t <- r1[[1]]
+set.seed(02062020) 
+
+Replicate_Data <- data.frame(matrix(nrow = nrow(data), ncol = s))
+Replicate_Data$County <- data$County
+for( i in 1:1000){
+  for (c in 1:nrow(Replicate_Data)){
+Replicate_Data[c,i] <- rpois(1, (Popul/1000)[c]*t[i,as.numeric(data$County)[c]])  
+  }
+}
+```
+
+```{r}
+Mean_Range <- rep(NA, s) 
+for (i in 1:s){
+df <- data.frame(Replicate_Data[,i], data$County)
+names(df) <- c("positive", "County")
+df_grouped <- df %>% group_by(County) %>%
+  summarize(mean_pos = mean(positive))
+Mean_Range[i] <- max(df_grouped$mean_pos) - min(df_grouped$mean_pos)
+}
+data_grouped <- data %>% group_by(County) %>%
+  summarize(mean_pos = mean(Postive.Tests))
+data_Mean_Range <- max(data_grouped$mean_pos) - min(data_grouped$mean_pos)
+```
+
+```{r, fig.cap="Posterior Predictive Simulation"}
+ggplot(data.frame(Mean_Range), aes(x=Mean_Range)) +
+geom_histogram() +
+geom_vline(xintercept=data_Mean_Range, col="red")
+```
+
+```{r, include=FALSE}
+sum(Mean_Range<data_Mean_Range) / 1000
+```
+
+We see that our observed test statistic is relatively consistent with the data simulated under our model. The posterior predictive p-value is 0.523. This suggests that our model does a reasonable job of capturing variability in mean number of positive cases per 1,000 people in counties. 
+
+Lastly, we create a scatterplot of the estimated number of cases in each county along the population in each county. Figure 5 shows the relationship between these two variables. Most of the values are clustered near the origin, but there does appear to be a decently weak positive, linear trend with possible outliers beyond a population of 400,000. One point is omitted from this graph only to allow a closer look at the smaller values. That point was Milwaukee county, with a population of almost 1,000,000 and estimated number of cases per 1,000 people 6. 
+
+```{r}
+data1 <- data.frame("Estimate" = summary(r1)[[1]][1:72,1], "Population" = Popul)
+```
+
+```{r, fig.cap="Relationship Between County Population and Estimated Rate of Cases"}
+ggplot(data = data1) + 
+  geom_point(mapping = aes(x = Population, y = Estimate)) + xlim(0,600000)
+```
+
+
+
+### Discussion and Conclusions   
+
+We have investigated the mean number of positive cases of COVID-19 per 1,000 people in a population and compared rates across counties. The evidence shows that the counties with the highest level of mean number of cases per 1,000 people are Brown, Racine, Milwaukee, and Kenosha counties. These counties are in the southeast corner of Wisconsin. For one, Milwaukee county has the greatest population in the state, so it makes sense that there would be a higher concentration there where there are more people packed in together at stores, on sidewalks, and on public transportation. Furthermore, these counties are closely located by Chicago, a current coronavirus hotspot in the United States. Brown County is considerably farther north than these other three counties, but the popular and well-populated city of Green Bay is in Brown County. Taylor, Langlade, and Portage counties have the lowest estimated number of cases per 1,000 people, but they were also among the counties with the smallest number of cases in the data and are also in upper-central Wisconsin.
+
+Analysis of the counties near and around Lawrence University (in the Fox Valley) showed Lawrence's Outagamie County to be neither more likely nor less likely to have a higher rate of positive cases than the other counties around it. This is likely due to the variability in the types of cities around Appleton: Brown County's Green Bay is a large, popular city that has a high number of cases, and Waupaca County and Waupaca itself are a little more out in the country, with a smaller population and less activity. Appleton and Outgamie County somewhat fall in the middle of popular and unpopular, making this result very reasonable.
+
+The trend of the scatterplot is mildly vague, but it does appear to be positive and somewhat linear, leading to the conclusion that as a county's population increases, the expected number of cases per 1,000 people also increases. This, again, makes sense when considering that higher populated cities and counties have more people in stores, on the streets, and in close quarters in places such as offices or on the bus. People in less populated cities and counties generally come in contact with fewer people.
+
+Because this was current data for all laboratory-confirmed cases in Wisconsin, we can say that it is an accurate representation of the whole state. However, it is only accurate of the information through 22 May 2020, so it is no longer up-to-date at the time this report is being written on 9 June 2020. Furthermore, it is beneficial to keep in mind and to reiterate that this is representative of the *laboratory-confirmed* cases; there is a possibility of there being more cases in the state of Wisconsin that went undiagnosed. This study did not consider factor such as average age of population or average socio-economic status of a county. Further research might investigate the relationship between coronavirus case rate and these factors. 
+
+\newpage 
+
+### References  
+
+Hauck, G., Gelles, K., Bravo, V. & Thorson, M. (2020, updated May 27). *Four months in: A timeline of how COVID-19 has unfolded in the US.* USA Today. https://www.usatoday.com/in-depth/news/nation/2020/04/21/coronavirus-updates-how-covid-19-unfolded-u-s-timeline/2990956001/
+
+Wisconsin Department of Health Services. (2020). *COVID-19: County Data.* https://www.dhs.wisconsin.gov/covid-19/county.htm
+
+Wisconsin Department of Health Services. (2020). *COVID-19 Historical Data Table.* https://www.dhs.wisconsin.gov/covid-19/county.htm
+
+World Health Organization. (2020, updated June 1).*Events as they happen.* https://www.who.int/emergencies/diseases/novel-coronavirus-2019/events-as-they-happen 
+
+
+\newpage
+
+## Appendix (optional)
+
+I made two other models very similar to the one I used in this report, but with different priors of Gamma(10,1) and Gamma(0.01, 0.001), respectively. This was a check to ensure that the prior I chose was a decent one. Since these graphs look nearly identical to Figure 2, I determined the chosen prior of Gamma(0.1, 0.01) to be acceptable.
+
+```{r}
+library(rjags)
+model2 <-"
+model {
+for(j in 1:n){
+y[j] ~ dpois(M[j]*theta[county[j]])
+}
+for (i in 1:numcounty){
+theta[i] ~ dgamma(a,b)
+}
+a <- mean^2/sig^2
+b <- mean/sig^2
+mean ~ dgamma(10,1)
+sig ~ dunif(0,1)
+}
+
+"
+dat <- list(M=Popul/1000, y=Positive, n=length(Positive),
+county=(data$County),
+numcounty=nlevels(data$County))
+s <- 1000
+```
+
+```{r, include=FALSE}
+m2 <- jags.model(textConnection(model2), dat)
+r2 = coda.samples(m2, c("theta"), n.iter=s)
+```
+
+```{r}
+County <- levels(data$County)
+Estimate <- summary(r2)[[1]][1:72,1]
+Lower <- summary(r2)[[2]][1:72,1]
+Upper <- summary(r2)[[2]][1:72,5]
+Model <- "Hierarchical"
+df_Covid2 <- data.frame(County, Estimate, Lower, Upper, Model)
+```
+
+```{r, fig.height=10, fig.cap="Credible Intervals for Mean Cases Per 1,000 People, First Test"}
+library(tidyverse)
+ggplot(df_Covid2, aes(xmin= Lower, xmax = Upper, y = reorder(County, desc(Estimate)), color=Model))+
+geom_linerange(lwd=1, position = position_dodge(.33)) +
+geom_point(aes(x=Estimate, y=County)) +
+labs(x=expression(theta), title='95% Credible Intervals') + theme_bw()
+```
+
+```{r}
+library(rjags)
+model3 <-"
+model {
+for(j in 1:n){
+y[j] ~ dpois(M[j]*theta[county[j]])
+}
+for (i in 1:numcounty){
+theta[i] ~ dgamma(a,b)
+}
+a <- mean^2/sig^2
+b <- mean/sig^2
+mean ~ dgamma(.01,.001)
+sig ~ dunif(0,1)
+}
+
+"
+dat <- list(M=Popul/1000, y=Positive, n=length(Positive),
+county=(data$County),
+numcounty=nlevels(data$County))
+s <- 1000
+```
+
+```{r, include=FALSE}
+m3 <- jags.model(textConnection(model3), dat)
+r3 = coda.samples(m3, c("theta"), n.iter=s)
+```
+
+
+```{r}
+County <- levels(data$County)
+Estimate <- summary(r3)[[1]][1:72,1]
+Lower <- summary(r3)[[2]][1:72,1]
+Upper <- summary(r3)[[2]][1:72,5]
+Model <- "Hierarchical"
+df_Covid3 <- data.frame(County, Estimate, Lower, Upper, Model)
+```
+
+```{r, fig.height=10, fig.cap="Credible Intervals for Mean Cases Per 1,000 People, Second Test"}
+library(tidyverse)
+ggplot(df_Covid3, aes(xmin= Lower, xmax = Upper, y = reorder(County, desc(Estimate)), color=Model))+
+geom_linerange(lwd=1, position = position_dodge(.33)) +
+geom_point(aes(x=Estimate, y=County)) +
+labs(x=expression(theta), title='95% Credible Intervals') + theme_bw()
+```
+
+

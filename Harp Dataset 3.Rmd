@@ -1,0 +1,104 @@
+---
+title: "Data-Scientific Programming: Assignment 9"
+author: "Johanna Kopecky"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+
+```{r}
+library(tidyverse)
+library(rvest)
+library(robotstxt)
+```
+
+
+
+
+
+```{r}
+page3 <- read_html("https://www.harpconnection.com/harpstore/harp-ClassicLever.html")
+```
+
+
+
+##### 3) Scrape in all of the following:
+
+a) name of the harp
+
+```{r}
+name3 <- page3 %>%
+  html_nodes(".plusplus a") %>%
+  html_text() %>%
+  as.character()
+
+head(name3)
+```
+
+b) price
+
+```{r}
+price3 <- page3 %>%
+  html_nodes(".THCsmall") %>%
+  html_text() %>%
+  str_split("Slightly")  %>%
+  map(1, .default=NA) %>%
+  str_remove_all("New from ") %>%
+  str_remove_all("\\$") %>%
+  str_remove_all("\\*") %>%
+  str_remove_all("\\\"") %>%
+  str_remove_all("\\,") %>%
+  as.numeric()
+
+head(price3)
+```
+
+c) company that made the harp 
+
+```{r}
+company3 <- page3 %>%
+  html_nodes(".plusplus .THCCenter") %>%
+  html_text() %>%
+  str_split("by ") %>%
+  map(2, .default=NA) %>%
+  as.character()
+
+head(company3)
+```
+
+d) number of strings
+
+```{r}
+strings3 <- page3 %>%
+  html_nodes(".THCHarpModel tr:nth-child(2) .paragraph") %>%
+  html_text() %>%
+  str_split("\\-") %>%
+  map(1, .default=NA) %>%
+  str_remove_all("\n") %>%
+  trimws() %>%
+  as.numeric()
+
+head(strings3)
+```
+
+e) type of harp
+
+```{r}
+type3 <- page3 %>%
+  html_nodes(".THCHarpModel tr:nth-child(2) .paragraph") %>%
+  html_text() %>%
+  str_split("String") %>%
+  map(2, .default=NA) %>%
+  str_remove_all("\n") %>%
+  str_remove_all("with Standard Pedal Harp") %>%
+  str_remove_all("\\(") %>%
+  trimws() %>%
+  as.character()
+
+head(type3)
+```
+
+####################################################################################

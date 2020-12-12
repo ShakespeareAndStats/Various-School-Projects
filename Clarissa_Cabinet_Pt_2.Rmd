@@ -1,0 +1,624 @@
+---
+title: "Statistically Significant Richardson, Pt 1"
+subtitle: "Text Mining and Literary Inference in Samuel Richardson's Clarissa"
+author: "Johanna Kopecky"
+date: "24 February 2020"
+output:
+  xaringan::moon_reader:
+    lib_dir: libs
+    css: xaringan-themer.css
+    nature:
+      ratio: "16:9"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+```{r xaringan-themer, include = FALSE}
+library(xaringanthemer)
+mono_light(
+  base_color = "#F47B6A",
+  header_font_google = google_font("Josefin Sans"),
+  text_font_google   = google_font("Montserrat", "300", "300i"),
+  code_font_google   = google_font("Droid Mono")
+)
+```
+
+
+```{r, echo=F, fig.width=7, fig.height=4, fig.align='center', message=FALSE, warning=FALSE}
+#load necessary packages
+library(ggformula)
+library(tidyverse)
+library(knitr)
+library(tidyverse)
+library(tidytext)
+library(rsample)
+```
+
+<style>
+
+  .col2 {
+
+    columns: 2 200px;         /* number of columns and width in pixels*/
+
+    -webkit-columns: 2 200px; /* chrome, safari */
+
+    -moz-columns: 2 200px;    /* firefox */
+
+  }
+
+  .col3 {
+
+    columns: 3 100px;
+
+    -webkit-columns: 3 100px;
+
+    -moz-columns: 3 100px;
+
+  }
+
+</style>
+
+
+
+## Overview
+
+
+* Preparing the Data
+
+* Comparing Hamlet to Other Works
+
+    -Probability of Identification By Word
+    
+    -ROC Curve
+
+    -Probability of Identification By Line
+
+* Future Work
+
+---
+
+## Preparing the Data
+
+.pull-left[
+
+* Download full text from Project Gutenberg using gutenbergr
+
+* Clean the data 
+
+    -Introductions and disclaimers
+    
+    -Name abbreviations
+    
+    -Proper nouns
+    
+    -"Stop words" of Renaissance nature
+
+* Now the data is how we want it
+
+]
+.pull-right[
+
+```{r, echo=FALSE}
+
+knitr::include_graphics("Gutenberg.jpg")
+
+```
+
+]
+
+---
+
+## Clarissa and Other Works
+
+* Read in Clarissa and Pride and Prejudice
+* Compare word frequency
+
+```{r, include=FALSE}
+library(gutenbergr)
+full_text7 <- gutenberg_download(11889)
+#Calling it full_text3 because it is from Volume 7
+
+cleaned_text7_0 <- full_text7[-c(1:458),]
+
+cleaned_text1 <- cleaned_text7_0
+
+names_full <- c("Clarissa", "Harlowe", "Robert", "Lovelace", "Arabella", "Bella", "Anna", "Howe", "Roger", "Solmes", "James", "John", "Belford", "Leman", "Esq", "Antony", "Clary", "Hervey", "Betty", "Norton", "Joseph", "Mr", "Miss", "Mrs", "Hickman", "Belton", "Dorcas", "Sinclair", "Charlotte", "Betty", "Sarah", "Montague", "Patty")
+shakes_stop <- c("thee", "thou", "thy", "tis", "Tis", "hath", "hast", "Enter", "twill", "art", "thyself", "ere", "whence", "Exeunt", "twixt", "Exit", "thine", "canst", "o'er", "is't", "on't", "wherefore", "wither", "wilt", "shalt", "shouldst", "wouldst", "nay", "yea", "Ay", "ay", "twere", "thence", "ye", "twas", "prithee", "doth", "th", "hither", "Act", "ACT", "Scene","II", "III", "IV", "V", "VI", "VII", "1")
+
+library(tm)
+cleaned_text1$text <- unlist(lapply(cleaned_text1$text, FUN=removeWords, words=names_full))
+cleaned_text1$text <- unlist(lapply(cleaned_text1$text, FUN=removeWords, words=shakes_stop))
+cleaned_text1$title <- "Clarissa"
+
+Pride <- gutenberg_download(1342)
+
+names_pride <- c("Elizabeth", "Lizzy", "Bennet", "Fitzwilliam", "Darcy", "Mr.", "Mrs.", "Gardiner", "Jane", "Mary", "Catherine", "Kitty", "Lydia", "Charles", "Bingley", "Caroline", "George", "Wickham", "William", "Collins", "Lady", "de Bourgh", "Edward", "Georgiana", "Charlotte", "Lucas", "Colonel", "Chapter", "said", "Mr", "s", "Miss", "Netherfield", "Longbourn", "Pemberley")
+Pride$text <- unlist(lapply(Pride$text, FUN=removeWords, words=names_pride))
+Pride$title <- "Pride and Prejudice"
+
+books <- rbind(cleaned_text1, Pride)
+books$document <- 1:nrow(books)
+```
+
+```{r, include=FALSE}
+tidy_book <- cleaned_text1 %>%
+  mutate(line = row_number()) %>%
+  unnest_tokens(word, text)
+
+tidy_book %>%
+  count(word, sort = TRUE)
+
+get_stopwords()
+get_stopwords(source = "smart")
+
+tidy_books <- books %>%
+  unnest_tokens(word, text) %>%
+  group_by(word) %>%
+  filter(n() > 10) %>%
+  ungroup()
+```
+
+```{r, echo=FALSE, fig.height=6, fig.width=10}
+tidy_books %>%
+  count(title, word, sort = TRUE) %>%
+  anti_join(get_stopwords()) %>%
+  group_by(title) %>%
+  top_n(5) %>%
+  ungroup() %>%
+  ggplot(aes(reorder_within(word, n, title), n,
+             fill = title
+  )) +
+  geom_col(alpha = 0.8, show.legend = FALSE) +
+  scale_x_reordered() +
+  coord_flip() +
+  facet_wrap(~title, scales = "free") +
+  scale_y_continuous(expand = c(0, 0)) +
+  labs(
+    x = NULL, y = "Word count",
+    title = "Most frequent words after removing stop words",
+    subtitle = "Comparing Clarissa and Pride and Prejudice"
+  )
+
+```
+
+---
+
+## Statistical Modelling for Identification
+
+We split the data into training and testing. We make a model (Logistic Regression Model with LASSO).
+
+Goal: Given a line of text, estimate the probability that it is from Clarissa.
+
+* Lines from the works
+* Predictor variable: words (whether they appear in the text)
+* Response variable: if from Clarissa
+* Explanatory variables: word frequencies (1259 words)
+
+
+```{r, echo=FALSE}
+books_split <- books %>%
+  select(document) %>%
+  initial_split()
+train_data <- training(books_split)
+test_data <- testing(books_split) 
+```
+
+```{r, include = FALSE}
+sparse_words <- tidy_books %>%
+  count(document, word) %>%
+  inner_join(train_data) %>%
+  cast_sparse(document, word, n)
+
+class(sparse_words)
+
+dim(sparse_words)
+
+word_rownames <- as.integer(rownames(sparse_words))
+
+books_joined <- data_frame(document = word_rownames) %>%
+  left_join(books %>%
+              select(document, title))
+
+library(glmnet)
+library(doParallel)
+registerDoParallel(cores = 3)
+
+is_clar <- books_joined$title == "Clarissa"
+model <- cv.glmnet(sparse_words, is_clar,
+                   family = "binomial",
+                   parallel = TRUE, keep = TRUE
+)
+```
+
+---
+
+## Statistical Modelling Cont.
+
+We estimate the regression coefficients associated with each word.
+
+
+```{r, echo=FALSE, fig.height=6, fig.width=10}
+coefs <- model$glmnet.fit %>%
+  tidy() %>%
+  filter(lambda == model$lambda.1se)
+
+coefs %>%
+  group_by(estimate > 0) %>%
+  top_n(5, abs(estimate)) %>%
+  ungroup() %>%
+  ggplot(aes(fct_reorder(term, estimate), estimate, fill = estimate > 0)) +
+  geom_col(alpha = 0.8, show.legend = FALSE) +
+  coord_flip() +
+  labs(
+    x = NULL,
+    title = "Coefficients that increase/decrease probability the most",
+    subtitle = "Comparing Clarissa and Pride and Prejudice"
+  )
+```
+
+---
+
+## ROC Curve
+
+We want to see if these inferences hold any merit or if we think the model is just randomly guessing.
+
+The AUC of this curve is about 0.888.
+
+```{r, echo=FALSE, fig.height=5, fig.width=8}
+intercept <- coefs %>%
+  filter(term == "(Intercept)") %>%
+  pull(estimate)
+
+classifications <- tidy_books %>%
+  inner_join(test_data) %>%
+  inner_join(coefs, by = c("word" = "term")) %>%
+  group_by(document) %>%
+  summarize(score = sum(estimate)) %>%
+  mutate(probability = plogis(intercept + score))
+
+library(yardstick)
+
+comment_classes <- classifications %>%
+  left_join(books %>%
+              select(title, document), by = "document") %>%
+  mutate(title = as.factor(title))
+
+comment_classes %>%
+  roc_curve(title, probability) %>%
+  ggplot(aes(x = 1 - specificity, y = sensitivity)) +
+  geom_line(
+    color = "midnightblue",
+    size = 1.5
+  ) +
+  geom_abline(
+    lty = 2, alpha = 0.5,
+    color = "gray50",
+    size = 1.2
+  ) +
+  labs(
+    title = "ROC curve for text classification using regularized regression",
+    subtitle = "Predicting whether text was written by Samuel Richardson or Jane Austen"
+  )
+```
+
+```{r, include=FALSE}
+comment_classes %>%
+  roc_auc(title, probability)
+```
+
+---
+
+## Probability of Identification By Line
+
+With probability for Clarissa > 0.5
+
+```{r, echo=FALSE}
+comment_classes %>%
+  mutate(
+    prediction = case_when(
+      probability > 0.5 ~ "Clarissa",
+      TRUE ~ "Pride and Prejudice"
+    ),
+    prediction = as.factor(prediction)
+  ) %>%
+  conf_mat(title, prediction)
+```
+
+---
+
+## Probability of Identification By Line Cont.
+
+High probability of being Clarissa (is Clarissa)
+
+* "ladies; and, in his light way, by the wretch himself." (0.961)
+* "letters by all the rest, who longed for my return to them." (0.857)
+* "And why, why this anger, dear Madam, (for she struggled to get her hand" (0.865)
+* "saint, and the purity of an angel: and was proceeding, when she said, No" (0.934)
+
+High probability of being Pride and Prejudice (is Pride and Prejudice)
+
+* "attachment. I had often seen him in love before. At that ball, while I" (0.0360)
+
+---
+
+## Probability of Identification By Line Cont.
+
+Pretty much just randomly guessing (is Clarissa)
+
+* "brother and sister; and my very heart torn in pieces by the wilful, and" (0.455)
+
+High probability of being Clarissa (is Pride and Prejudice)
+
+* "conscientious and polite young man, upon my word, and I doubt not will" (0.968)
+
+High probability of being Pride and Prejudice (is Clarissa)
+
+* "visit from the two young ladies, on a very particular occasion; the" (0.285)
+
+---
+
+## Clarissa and Other Works Pt 2
+
+* Read in Clarissa and Pamela
+* Note: Pamela NOT CLEAN
+* Compare word frequency
+
+```{r, include=FALSE}
+library(gutenbergr)
+full_text70 <- gutenberg_download(11889)
+#Calling it full_text3 because it is from Volume 7
+
+cleaned_text7_00 <- full_text70[-c(1:458),]
+
+cleaned_text10 <- cleaned_text7_00
+
+names_full <- c("Clarissa", "Harlowe", "Robert", "Lovelace", "Arabella", "Bella", "Anna", "Howe", "Roger", "Solmes", "James", "John", "Belford", "Leman", "Esq", "Antony", "Clary", "Hervey", "Betty", "Norton", "Joseph", "Mr", "Miss", "Mrs", "Hickman", "Belton", "Dorcas", "Sinclair", "Charlotte", "Betty", "Sarah", "Montague", "Patty")
+shakes_stop <- c("thee", "thou", "thy", "tis", "Tis", "hath", "hast", "Enter", "twill", "art", "thyself", "ere", "whence", "Exeunt", "twixt", "Exit", "thine", "canst", "o'er", "is't", "on't", "wherefore", "wither", "wilt", "shalt", "shouldst", "wouldst", "nay", "yea", "Ay", "ay", "twere", "thence", "ye", "twas", "prithee", "doth", "th", "hither", "Act", "ACT", "Scene","II", "III", "IV", "V", "VI", "VII", "1")
+
+library(tm)
+cleaned_text10$text <- unlist(lapply(cleaned_text10$text, FUN=removeWords, words=names_full))
+cleaned_text10$text <- unlist(lapply(cleaned_text10$text, FUN=removeWords, words=shakes_stop))
+cleaned_text10$title <- "Clarissa"
+
+Pamela <- gutenberg_download(6124)
+
+Pamela0 <- Pamela[-c(1:48),]
+
+Pamela0$title <- "Pamela"
+
+books2 <- rbind(cleaned_text10, Pamela0)
+books2$document <- 1:nrow(books2)
+```
+
+```{r, include=FALSE}
+tidy_book2 <- cleaned_text10 %>%
+  mutate(line = row_number()) %>%
+  unnest_tokens(word, text)
+
+tidy_book2 %>%
+  count(word, sort = TRUE)
+
+get_stopwords()
+get_stopwords(source = "smart")
+
+tidy_books2 <- books2 %>%
+  unnest_tokens(word, text) %>%
+  group_by(word) %>%
+  filter(n() > 10) %>%
+  ungroup()
+```
+
+```{r, echo=FALSE, fig.height=6, fig.width=10}
+tidy_books2 %>%
+  count(title, word, sort = TRUE) %>%
+  anti_join(get_stopwords()) %>%
+  group_by(title) %>%
+  top_n(10) %>%
+  ungroup() %>%
+  ggplot(aes(reorder_within(word, n, title), n,
+             fill = title
+  )) +
+  geom_col(alpha = 0.8, show.legend = FALSE) +
+  scale_x_reordered() +
+  coord_flip() +
+  facet_wrap(~title, scales = "free") +
+  scale_y_continuous(expand = c(0, 0)) +
+  labs(
+    x = NULL, y = "Word count",
+    title = "Most frequent words after removing stop words",
+    subtitle = "Comparing Clarissa and Pamela"
+  )
+
+```
+
+---
+
+## Statistical Modelling for Identification
+
+We split the data into training and testing. We make a model (Logistic Regression Model with LASSO).
+
+Goal: Given a line of text, estimate the probability that it is from Clarissa.
+
+* Lines from the works
+* Predictor variable: words (whether they appear in the text)
+* Response variable: if from Clarissa
+* Explanatory variables: word frequencies (1259 words)
+
+
+```{r, echo=FALSE}
+books_split2 <- books2 %>%
+  select(document) %>%
+  initial_split()
+train_data2 <- training(books_split2)
+test_data2 <- testing(books_split2) 
+```
+
+```{r, include = FALSE}
+sparse_words2 <- tidy_books2 %>%
+  count(document, word) %>%
+  inner_join(train_data2) %>%
+  cast_sparse(document, word, n)
+
+class(sparse_words2)
+
+dim(sparse_words2)
+
+word_rownames2 <- as.integer(rownames(sparse_words2))
+
+books_joined2 <- data_frame(document = word_rownames2) %>%
+  left_join(books2 %>%
+              select(document, title))
+
+library(glmnet)
+library(doParallel)
+registerDoParallel(cores = 3)
+
+is_clar2 <- books_joined2$title == "Clarissa"
+model2 <- cv.glmnet(sparse_words2, is_clar2,
+                   family = "binomial",
+                   parallel = TRUE, keep = TRUE
+)
+```
+
+---
+
+## Statistical Modelling Cont.
+
+We estimate the regression coefficients associated with each word.
+
+
+```{r, echo=FALSE, fig.height=6, fig.width=10}
+coefs2 <- model2$glmnet.fit %>%
+  tidy() %>%
+  filter(lambda == model2$lambda.1se)
+
+coefs2 %>%
+  group_by(estimate > 0) %>%
+  top_n(5, abs(estimate)) %>%
+  ungroup() %>%
+  ggplot(aes(fct_reorder(term, estimate), estimate, fill = estimate > 0)) +
+  geom_col(alpha = 0.8, show.legend = FALSE) +
+  coord_flip() +
+  labs(
+    x = NULL,
+    title = "Coefficients that increase/decrease probability the most",
+    subtitle = "Comparing Clarissa and Pamela"
+  )
+```
+
+---
+
+## ROC Curve
+
+We want to see if these inferences hold any merit or if we think the model is just randomly guessing.
+
+The AUC of this curve is about 0.51.
+
+```{r, echo=FALSE, fig.height=5, fig.width=8}
+intercept2 <- coefs2 %>%
+  filter(term == "(Intercept)") %>%
+  pull(estimate)
+
+classifications2 <- tidy_books2 %>%
+  inner_join(test_data2) %>%
+  inner_join(coefs, by = c("word" = "term")) %>%
+  group_by(document) %>%
+  summarize(score = sum(estimate)) %>%
+  mutate(probability = plogis(intercept2 + score))
+
+library(yardstick)
+
+comment_classes2 <- classifications2 %>%
+  left_join(books2 %>%
+              select(title, document), by = "document") %>%
+  mutate(title = as.factor(title))
+
+comment_classes2 %>%
+  roc_curve(title, probability) %>%
+  ggplot(aes(x = 1 - specificity, y = sensitivity)) +
+  geom_line(
+    color = "midnightblue",
+    size = 1.5
+  ) +
+  geom_abline(
+    lty = 2, alpha = 0.5,
+    color = "gray50",
+    size = 1.2
+  ) +
+  labs(
+    title = "ROC curve for text classification using regularized regression",
+    subtitle = "Predicting whether text was Clarissa or Pamela"
+  )
+```
+
+```{r, include=FALSE}
+comment_classes2 %>%
+  roc_auc(title, probability)
+```
+
+---
+
+## Probability of Identification By Line
+
+With probability for Clarissa > 0.5
+
+```{r, echo=FALSE}
+comment_classes2 %>%
+  mutate(
+    prediction = case_when(
+      probability > 0.5 ~ "Clarissa",
+      TRUE ~ "Pamela"
+    ),
+    prediction = as.factor(prediction)
+  ) %>%
+  conf_mat(title, prediction)
+```
+
+
+---
+
+## Probability of Identification By Line Cont.
+
+High probability of being Clarissa (is Clarissa)
+
+* "my revenge, if they perish in the flames I shall light up, will be" (0.980)
+
+High probability of being Pamela (is Pamela)
+
+* ""What think you of books?" he, smiling." (0.144)
+
+Pretty much just randomly guessing (is Clarissa)
+
+* "crimes of such a nature?" (0.492)
+
+---
+
+## Future Work
+
+* Clean Pamela
+* Consider models other than logistic regression with LASSO
+
+
+---
+
+## References/Acknowledgements
+
+* Julia Silge, code and Text Mining in R
+
+    -Silge, J., & Robinson, D. (2017). Text mining with R: A tidy approach. Sebastopol, CA: OReilly Media.
+
+    -Silge, J. (n.d.). TEXT CLASSIFICATION WITH TIDY DATA PRINCIPLES. Retrieved from https://juliasilge.com/blog/tidy-text-classification/
+
+* Professor Andrew Sage, advisor
+* Clare Boothe Luce Scholar Program
+
+---
+
+## Questions?
+
+* Email: johanna.r.kopecky@lawrence.edu
+* Github: ShakespeareAndStats
+
+

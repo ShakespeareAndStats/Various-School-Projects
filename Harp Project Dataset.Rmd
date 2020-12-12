@@ -1,0 +1,298 @@
+---
+title: "Data-Scientific Programming: Assignment 9"
+author: "Johanna Kopecky"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+
+```{r}
+library(tidyverse)
+library(rvest)
+library(robotstxt)
+```
+
+
+```{r}
+paths_allowed("https://www.harpconnection.com/harpstore/harp-ConcertPedal.html")
+```
+
+```{r}
+page1 <- read_html("https://www.harpconnection.com/harpstore/harp-ConcertPedal.html")
+```
+
+```{r}
+page2 <- read_html("https://www.harpconnection.com/harpstore/harp-SemiPetitePedal.html")
+```
+
+```{r}
+page3 <- read_html("https://www.harpconnection.com/harpstore/harp-ClassicLever.html")
+```
+
+```{r}
+page4 <- read_html("https://www.harpconnection.com/harpstore/harp-CelticHarps.html")
+```
+
+
+a) name of the harp
+
+```{r}
+name4 <- page4 %>%
+  html_nodes(".plusplus a") %>%
+  html_text() %>%
+  as.character()
+
+name3 <- page3 %>%
+  html_nodes(".plusplus a") %>%
+  html_text() %>%
+  as.character()
+
+name2 <- page2 %>%
+  html_nodes("#stacks_in_2_page39 .THCCenter a") %>%
+  html_text() %>%
+  as.character()
+
+name2 <- name2[2:length(name2)]
+
+name <- page1 %>%
+  html_nodes("#stacks_in_2_page39 .THCCenter a") %>%
+  html_text() %>%
+  as.character()
+
+name <- name[2:length(name)]
+
+head(name)
+head(name2)
+head(name3)
+head(name4)
+
+```
+
+b) price
+
+```{r}
+price4 <- page4 %>% #longer
+  html_nodes(".THCsmall") %>%
+  html_text() %>%
+  str_split("Slightly")  %>%
+  map(1, .default=NA) %>%
+  str_remove_all("New from ") %>%
+  str_remove_all("\\$") %>%
+  str_remove_all("\\*") %>%
+  str_remove_all("\\\"") %>%
+  str_remove_all("\\,") %>%
+  as.numeric()
+
+price3 <- page3 %>%
+  html_nodes(".THCsmall") %>%
+  html_text() %>%
+  str_split("Slightly")  %>%
+  map(1, .default=NA) %>%
+  str_remove_all("New from ") %>%
+  str_remove_all("\\$") %>%
+  str_remove_all("\\*") %>%
+  str_remove_all("\\\"") %>%
+  str_remove_all("\\,") %>%
+  as.numeric()
+
+price2 <- page2 %>%
+  html_nodes(".THCsmall") %>%
+  html_text() %>%
+  str_remove_all("New from ") %>%
+  str_remove_all("\\$") %>%
+  str_remove_all("\\*") %>%
+  str_remove_all("\\,") %>%
+  as.numeric()
+
+price <- page1 %>%
+  html_nodes(".THCsmall") %>%
+  html_text() %>%
+  str_remove_all("New from ") %>%
+  str_remove_all("\\$") %>%
+  str_remove_all("\\*") %>%
+  str_remove_all("\\,") %>%
+  as.numeric()
+
+```
+
+c) company that made the harp 
+
+```{r}
+company4 <- page4 %>% #all same
+  html_nodes(".plusplus .THCCenter") %>%
+  html_text() %>%
+  str_split("by ") %>%
+  map(2, .default=NA) %>%
+  as.character()
+
+company3 <- page3 %>%
+  html_nodes(".plusplus .THCCenter") %>%
+  html_text() %>%
+  str_split("by ") %>%
+  map(2, .default=NA) %>%
+  as.character()
+
+company2 <- page2 %>%
+  html_nodes(".plusplus .THCCenter") %>%
+  html_text() %>%
+  str_split("by ") %>%
+  map(2, .default=NA) %>%
+  as.character()
+
+company <- page1 %>%
+  html_nodes(".plusplus .THCCenter") %>%
+  html_text() %>%
+  str_split("by ") %>%
+  map(2, .default=NA) %>%
+  as.character()
+
+```
+
+d) number of strings
+
+```{r}
+strings4 <- page4 %>% #all the same
+  html_nodes(".THCHarpModel tr:nth-child(2) .paragraph") %>%
+  html_text() %>%
+  str_split("\\-") %>%
+  map(1, .default=NA) %>%
+  str_remove_all("\n") %>%
+  trimws() %>%
+  as.numeric()
+
+strings3 <- page3 %>%
+  html_nodes(".THCHarpModel tr:nth-child(2) .paragraph") %>%
+  html_text() %>%
+  str_split("\\-") %>%
+  map(1, .default=NA) %>%
+  str_remove_all("\n") %>%
+  trimws() %>%
+  as.numeric()
+
+strings2 <- page2 %>%
+  html_nodes(".THCHarpModel tr:nth-child(2) .paragraph") %>%
+  html_text() %>%
+  str_split("\\-") %>%
+  map(1, .default=NA) %>%
+  str_remove_all("\n") %>%
+  trimws() %>%
+  as.numeric()
+
+strings <- page1 %>%
+  html_nodes(".THCHarpModel tr:nth-child(2) .paragraph") %>%
+  html_text() %>%
+  str_split("\\-") %>%
+  map(1, .default=NA) %>%
+  str_remove_all("\n") %>%
+  trimws() %>%
+  as.numeric()
+
+```
+
+e) type of harp
+
+```{r}
+type4 <- page4 %>%
+  html_nodes(".THCHarpModel tr:nth-child(2) .paragraph") %>%
+  html_text() %>%
+  str_split("String") %>%
+  map(2, .default=NA) %>%
+  str_remove_all("\n") %>%
+  trimws() %>%
+  as.character()
+
+type3 <- page3 %>%
+  html_nodes(".THCHarpModel tr:nth-child(2) .paragraph") %>% #longer
+  html_text() %>%
+  str_split("String") %>%
+  map(2, .default=NA) %>%
+  str_remove_all("\n") %>%
+  str_remove_all("with Standard Pedal Harp") %>%
+  str_remove_all("\\(") %>%
+  trimws() %>%
+  as.character()
+
+type2 <- page2 %>%
+  html_nodes(".THCHarpModel tr:nth-child(2) .paragraph") %>%
+  html_text() %>%
+  str_split("String") %>%
+  map(2, .default=NA) %>%
+  str_remove_all("\n") %>%
+  trimws() %>%
+  as.character()
+
+type <- page1 %>%
+  html_nodes(".THCHarpModel tr:nth-child(2) .paragraph") %>%
+  html_text() %>%
+  str_split("String") %>%
+  map(2, .default=NA) %>%
+  str_remove_all("\n") %>%
+  trimws() %>%
+  as.character()
+
+```
+
+
+
+
+
+
+
+
+
+
+
+#########################################################################
+
+
+
+
+
+```{r}
+type <- (c("Concert-Grand Pedal Harp" = "Concert Grand Pedal Harp"))
+
+harps1 <- tibble(name, price, strings, company, type)
+
+harps1
+```
+
+```{r}
+harps2 <- tibble(name2, price2, strings2, company2, type2)
+
+names(harps2) <- c("name", "price", "strings", "company", "type")
+
+head(harps2)
+```
+
+```{r}
+harps3 <- tibble(name3, price3, strings3, company3, type3)
+
+names(harps3) <- c("name", "price", "strings", "company", "type")
+
+head(harps3)
+```
+
+```{r}
+harps4 <- tibble(name4, price4, strings4, company4, type4)
+
+names(harps4) <- c("name", "price", "strings", "company", "type")
+
+head(harps4)
+```
+
+
+```{r}
+harps <- rbind(harps1, harps2, harps3, harps4)
+
+harps
+```
+
+```{r}
+write.csv(harps, file = 'harpsdataset.csv')
+```
+
+
+

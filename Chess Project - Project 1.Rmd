@@ -1,0 +1,45 @@
+---
+title: "Better at Chess: A Brief Analysis of Player Ratings and Victories in Online Chess"
+author: "Johanna Kopecky, Lawrence University"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+```
+
+Does having a higher chess rating correlate with winning? Using the data from 20,000 games of chess collected from a selection of users on the online chess website Lichess.org, we can consider a correlation between the ratings of black players and white players in prospective of the outcome of the game. The below graph maps the matches played between two individuals, the rating each individual had upon entry to the game, and the winner of the match (denoted with colour.)
+
+
+```{r}
+library(tidyverse)
+
+chess <- read.csv("chess.csv")
+
+chessgraph <- ggplot(data = chess) + 
+  geom_text(x=2125, y=2729, label="ranchowangdu vs justicebot", color="black") + 
+  geom_point(mapping = aes(x = white_rating, y = black_rating, color = winner), alpha = 1/5) +
+  geom_curve(x=1750, xend=1550, y=2729, yend=2729, arrow=arrow(length=unit(0.3, "cm")), curvature=0)
+
+chessgraph <- chessgraph +
+  geom_text(x=2125, y=770, label="lance5500 vs oguzkagangurer", color="black") +
+  geom_curve(x=2510, xend=2625, y=750, yend=1600, arrow=arrow(length=unit(0.3, "cm")), curvature=0.5) +
+  xlab("White Player Rating") + ylab("Black Player Rating") + ggtitle("Player Ratings With Victories")
+```
+
+```{r, fig.height=4, fig.width=7}
+chessgraph
+```
+
+The above graphic illustrates a positive linear trend with matches played between two players, showing that players of similar rating are often assigned to play each other. The darker shading of the dots near this central line show a higher concentration of games played along that line; that is, most matches are comprised of player with the same, or very similar, ratings. Along this vein, it makes sense to observe that most of the ties appear to exist near this central line. The line is not concrete, however, and sometimes players are paired with an opponent with either a lower or high score than their own. This graphic solidifies that which might be intuitive: with the bottom half of the linear trend dominantly blue (signifying a white player's victory) and the top half of the linear trend dominantly pink (signifying a black player's victory), it appears that a player with a rating score higher than their opponent will usually win the game. There is a high concentration of matches along the rating of 1500 for both black and white players. This is because the website assigns a rating of 1500 to new players, and their rating either increases or decreases after the completion of their first game.
+
+Again, according, to the data, a player with a higher rating than their opponent will generally win the game. However, there are some rare and interesting instances where this was not the case. One such example is the game played by chess players "ranchowangdu" (white) and "justicebot" (black). In this instance, ranchowangdu was significantly lower than justicebot in ratings, with ranchowangdu rated at 1500 and justicebot an impressive 2723. However, despite the presupposition that justicebot would win the match, the lower-rated ranchowangdu claimed victory. In a similar situatation but with reversed colours, "lance5500" (white) was scored highly with a rating of 2621 and their opponent "oguzkagangurer" (black) was scored far below with a rating of 1613. However, again, in this particular instance, the lower-rated played won the match.
+
+While this graph shows the overall trend of a player's rating, ability, and victory in a game of chess, it can also give hope to the inexperienced player: it is not statistically impossible to win a game against a skilled opponent!
+
+
+Works Cited
+
+Mitchell J (2018). *Chess Game Dataset (Lichess)*. Kaggle.com. https://www.kaggle.com/datasnaek/chess 
+
+

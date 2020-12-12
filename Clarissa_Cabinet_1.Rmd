@@ -1,0 +1,210 @@
+---
+title: "Statistically Significant Richardson, Pt 1"
+subtitle: "Text Mining and Literary Inference in Samuel Richardson's Clarissa"
+author: "Johanna Kopecky"
+date: "24 January 2020"
+output:
+  xaringan::moon_reader:
+    lib_dir: libs
+    css: xaringan-themer.css
+    nature:
+      ratio: "16:9"
+---
+---
+title: "Statistically Significant Shakespeare"
+subtitle: "Using Text Mining and Statistical Modeling to Distinguish Shakespeare From Other Authors"
+author: "Johanna Kopecky"
+date: "15 August 2019"
+output:
+  xaringan::moon_reader:
+    lib_dir: libs
+    css: xaringan-themer.css
+    nature:
+      ratio: "16:9"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+```{r xaringan-themer, include = FALSE}
+library(xaringanthemer)
+mono_light(
+  base_color = "#F47B6A",
+  header_font_google = google_font("Josefin Sans"),
+  text_font_google   = google_font("Montserrat", "300", "300i"),
+  code_font_google   = google_font("Droid Mono")
+)
+```
+
+
+```{r, echo=F, fig.width=7, fig.height=4, fig.align='center', message=FALSE, warning=FALSE}
+#load necessary packages
+library(ggformula)
+library(tidyverse)
+library(knitr)
+library(tidyverse)
+library(tidytext)
+library(rsample)
+```
+
+<style>
+
+  .col2 {
+
+    columns: 2 200px;         /* number of columns and width in pixels*/
+
+    -webkit-columns: 2 200px; /* chrome, safari */
+
+    -moz-columns: 2 200px;    /* firefox */
+
+  }
+
+  .col3 {
+
+    columns: 3 100px;
+
+    -webkit-columns: 3 100px;
+
+    -moz-columns: 3 100px;
+
+  }
+
+</style>
+
+
+
+## Overview
+
+
+* Preparing the Data
+* Data from Clarissa
+
+    -Word Frequency
+
+    -Two-Word Phrases
+
+* Future Work
+
+---
+
+## Preparing the Data
+
+
+* Download full text from Project Gutenberg using gutenbergr
+
+* Clean the data 
+
+    -Introductions and disclaimers
+    
+    -"Stop words"
+
+```{r, echo=FALSE}
+get_stopwords()
+```
+
+---
+
+## Word Frequency of Clarissa
+
+Top 10 words that appear in Clarissa (stop words removed)
+
+```{r, include=FALSE}
+library(gutenbergr)
+full_text3 <- gutenberg_download(9881)
+#Calling it full_text3 because it is from Volume 3
+
+cleaned_text3_0 <- full_text3[-c(1:297),]
+
+cleaned_text3_1 <- cleaned_text3_0
+
+library(tm)
+
+tidy_book <- cleaned_text3_1 %>%
+  mutate(line = row_number()) %>%
+  unnest_tokens(word, text)
+
+tidy_book %>%
+  count(word, sort = TRUE)
+
+get_stopwords()
+get_stopwords(source = "smart")
+```
+
+```{r, ,echo=FALSE, fig.height=6, fig.width=10}
+tidy_book %>%
+  anti_join(get_stopwords(source = "smart")) %>%
+  count(word, sort = TRUE) %>%
+  top_n(10) %>%
+  ggplot(aes(fct_reorder(word, n), n)) +
+  geom_col() +
+  coord_flip()
+```
+
+---
+
+## Two-Word Phrases
+
+Top 10 two-word phrases that appear in Clarissa (stop words removed)
+
+```{r, include=FALSE}
+tidy_ngram <- cleaned_text3_1 %>%
+  unnest_tokens(bigram, text, token = "ngrams", n = 2)
+tidy_ngram
+
+tidy_ngram %>%
+  count(bigram, sort = TRUE)
+
+tidy_ngram %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  filter(!word1 %in% stop_words$word,
+         !word2 %in% stop_words$word) %>%
+  count(word1, word2, sort = TRUE)
+
+tidy_bigram <- tidy_ngram %>%
+  #anti_join(get_stopwords(source = "smart")) %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  filter(!word1 %in% stop_words$word,
+         !word2 %in% stop_words$word) %>%
+  count(word1, word2, sort = TRUE) %>%
+  top_n(10)
+```
+
+```{r, echo=FALSE}
+tidy_bigram$two_word <- paste(tidy_bigram$word1, " ", tidy_bigram$word2)
+
+tidy_bigram[1:6,] %>% 
+  ggplot(aes(fct_reorder(two_word, n), n)) +
+  geom_col() +
+  coord_flip() +
+  xlab("phrase") +
+  ylab("occurances")
+
+```
+
+---
+
+## Future Work
+
+* Compare Clarissa with a different work (Paradise Lost)
+* Compare Clarissa with a similar work (Pamela)
+
+---
+
+## References/Acknowledgements
+
+* Julia Silge, code and Text Mining in R
+
+    -Silge, J., & Robinson, D. (2017). Text mining with R: A tidy approach. Sebastopol, CA: OReilly Media.
+
+    -Silge, J. (n.d.). TEXT CLASSIFICATION WITH TIDY DATA PRINCIPLES. Retrieved from https://juliasilge.com/blog/tidy-text-classification/
+
+* Professor Andrew Sage, advisor
+* Professor Celia Barnes, advisor
+
+---
+
+## Questions?
+
+* Email: johanna.r.kopecky@lawrence.edu
+* Github: ShakespeareAndStats

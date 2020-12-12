@@ -1,0 +1,65 @@
+---
+title: "Data-Scientific Programming: Assignment 8"
+author: "Enter your name"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+```
+
+```{r}
+library(shiny)
+library(tidyverse)
+library(gapminder)
+
+harps <- read.csv("harpsdataset.csv")
+
+# Define UI for application 
+ui <- fluidPage(
+   
+   # Application title
+   titlePanel("Harp Scatterplot"),
+   
+  fluidRow(
+     
+     column(4,
+    checkboxGroupInput('type', 'Type of harp to display:', 
+                              sort(unique(harps$type)),
+                              selected=c("Concert Grand Pedal Harp", "Semi-Grand Pedal Harp"))
+      )
+  ),
+
+    # Show a plot of the generated distribution
+  mainPanel(
+      plotOutput("plot")
+    )
+   )
+
+# Define server logic required to draw a histogram
+server <- function(input, output) {
+   
+   output$plot <- renderPlot({
+      Type0 <- input$type
+      
+      
+      
+      # draw the histogram with the specified number of bins
+      type_df <- harps %>%
+         filter(type %in% Type0)
+      
+      ggplot(data = type_df) + 
+      geom_point(mapping = aes(x = strings, y = price, color = company)) +
+                  xlab("Number of Strings") + ylab("Price") +
+                  xlim(25, 50) + ylim(0,40000)
+      
+                 
+     })
+   
+}
+
+
+# Run the application 
+shinyApp(ui = ui, server = server)
+```

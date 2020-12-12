@@ -1,0 +1,37 @@
+---
+title: "The Harp Gallery: A Data Visualisation of Pedal Harps and Lever Harps For Sale Online"
+author: "Johanna Kopecky"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE, fig.height = 4, fig.width = 6 )
+```
+
+
+```{r}
+library(tidyverse) 
+```
+
+## Shiny App Discussion
+
+
+The intention of this project was to compare the prices, number of strings, manufacturing company, and type of harps sold on the website harpconnection.com. When just opening the app, the reader sees a scatterplot displaying points representative of the Concert Grand Pedal Harps and the Semi-Grand Pedal Harps, as pictured in Screenshot (7) below. This first glance of the abilities of the graph already give a fair amount of information concerning the harps available on the website. From the initial graph, viewers can see that all of the Concert Grand Pedal Harps and all of the Semi-Grand Pedal harps have 47 strings and that they were either made by the famous harp companies Lyon & Healy or Salvi. There is a somewhat higher concentration of Lyon & Healy points in the higher price range than Salvi, with the two most expensive harps being of Lyon & Healy and significantly more expensive than the most expensive Salvi harp. The prices of these 47-string harps vary from around 14,000 dollars to 38,000 dollars. With such a wide range, it is very likely that variables other than number of strings and manufacturer impact the price of a Concert Grand or Semi-Grand Pedal Harp (likely a factor such as the harp’s appearance -- for example, if the column is plated in gold -- and other aesthetic variables that were not considered in this dataset). 
+
+
+![Screenshot (7)](Screenshot (7).png){width=700px}
+
+
+There is more to be seen from this app, however, than just considering these two types of harps alone. The user is able to display any combination of several different types of harp. There could be many benefits to any sort of combination, but considering all of the options together give the most information about the dataset as a whole. From the image Screenshot (9) below, several things are discernable through the representation in the graph. The graph appears to display a positive, loosely linear, loosely strong  correlation between the number of strings a harp has and what the harp costs, with possible outliers in the two most expensive 47-string Lyon & Healy harps. Another consideration of the trend of the graph may be that it has somewhat more of an exponential curve to it rather than a linear trend with outliers. If true, this would lead to the interpretation that the price of harps increases exponentially as the number of strings on the harp increases. This would not be an entirely unreasonable estimate, as the increase in strings additionally implies the increase in material, construction, and craftsmanship in a way that may not be only linearly proportional. Additionally, the graph implies that Dusty Strings harps appear in both the cheaper and smaller points of the graph while Salvi and Lyon & Healy tend to stay more in the larger and more expensive ends of things. Lyon & Healy shows the greatest variability, likely because they make Pedal Harps and Lever Harps alike, as would be evident from exploring the tick boxes. Furthermore, Dusty Strings proves to only make Lever Harps, likely largely accounting for the relative inexpensiveness in comparison with the top name Pedal Harp companies.
+
+
+
+![Screenshot (9)](Screenshot (9).png){width=700px}
+
+
+
+
+## Technical Report 
+
+The most prominent and important way in which I used skills from this class in this project is the way I used webscraping to make my own dataset. The webscraping techniques we learned in class as well as the homework problem we had that dealt with the eBay page was essential to building my skill, comfort, and ability to think in this area of collecting data. It was difficult to find a page that displayed enough information for me to make a dataset of a decent number of variables. A unique struggle with this topic is that harp websites often do not post the prices of harps and instead prefer that you contact them to show how serious you are in a particular harp before giving you an estimate in the price. The page(s) I worked with also had the problem of the movie problem in class where not every variable could be found in its own “box”, so I had to get the entire box and use trimming skills to trim it down to the information I wanted. It was occasionally difficult to find all of the things that needed to be deselected in order to get the code that I needed to, but eventually there was always a way to do it -- an aspect that I found most cool. All of variables originally came up as character vectors, so I needed to remove the commas and dollar signs in order to make my prices numeric variables and remove lots of words in order to make the number of strings simply say the number of strings, rather than the worded description of “47-String.” I also wanted a dataset with a decent number of variables and there is not a great variety of harps in the world to begin with, so I took information from four different pages in the website. Working the webscraping into a dataset was decently straightforward enough, but I had to eliminate some rows in the pedal harp sections that I could not deselect and also clarify the website’s inconsistency that “Concert-Grand Pedal Harp” and “Concert Grand Pedal Harp” were the same thing, using data wrangling. The construction of the app itself was very similar to the homework problems and exercises from class, but included the unique challenges of making sure I knew which variables I wanted to be displayed, how I wanted them to be displayed, and ensuring the method of scatterplot was an appropriate way to present the data. I did not attempt any other ways of presenting the data, deciding after the first try that a scatterplot with colour-coded dots was a very efficient way of presenting the information. 

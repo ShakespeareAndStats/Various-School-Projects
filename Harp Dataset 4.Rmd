@@ -1,0 +1,133 @@
+---
+title: "Data-Scientific Programming: Assignment 9"
+author: "Johanna Kopecky"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+
+```{r}
+library(tidyverse)
+library(rvest)
+library(robotstxt)
+```
+
+
+```{r}
+page4 <- read_html("https://www.harpconnection.com/harpstore/harp-CelticHarps.html")
+```
+
+##### 3) Scrape in all of the following:
+
+a) name of the harp
+
+```{r}
+name4 <- page4 %>%
+  html_nodes(".plusplus a") %>%
+  html_text() %>%
+  as.character()
+
+head(name4)
+```
+
+b) price
+
+```{r}
+price4 <- page4 %>%
+  html_nodes(".THCsmall") %>%
+  html_text() %>%
+  str_split("Slightly")  %>%
+  map(1, .default=NA) %>%
+  str_remove_all("New from ") %>%
+  str_remove_all("\\$") %>%
+  str_remove_all("\\*") %>%
+  str_remove_all("\\\"") %>%
+  str_remove_all("\\,") %>%
+  as.numeric()
+
+head(price4)
+```
+
+c) company that made the harp 
+
+```{r}
+company4 <- page4 %>%
+  html_nodes(".plusplus .THCCenter") %>%
+  html_text() %>%
+  str_split("by ") %>%
+  map(2, .default=NA) %>%
+  as.character()
+
+head(company4)
+```
+
+d) number of strings
+
+```{r}
+strings4 <- page4 %>%
+  html_nodes(".THCHarpModel tr:nth-child(2) .paragraph") %>%
+  html_text() %>%
+  str_split("\\-") %>%
+  map(1, .default=NA) %>%
+  str_remove_all("\n") %>%
+  trimws() %>%
+  as.numeric()
+
+head(strings4)
+```
+
+e) type of harp
+
+```{r}
+type4 <- page4 %>%
+  html_nodes(".THCHarpModel tr:nth-child(2) .paragraph") %>%
+  html_text() %>%
+  str_split("String") %>%
+  map(2, .default=NA) %>%
+  str_remove_all("\n") %>%
+  trimws() %>%
+  as.character()
+
+head(type4)
+```
+
+#########################################################################
+
+```{r}
+harps1 <- tibble(name, price, strings, company, type)
+
+head(harps1)
+```
+
+```{r}
+harps2 <- tibble(name2, price2, strings2, company2, type2)
+
+head(harps2)
+```
+
+```{r}
+harps3 <- tibble(name3, price3, strings3, company3, type3)
+
+head(harps3)
+```
+
+```{r}
+harps4 <- tibble(name4, price4, strings4, company4, type4)
+
+head(harps4)
+```
+
+```{r}
+harps02 <- full_join(x=harps3, y=harps4, by=c("name3"="name4"))
+
+head(harps02)
+```
+
+
+
+
+
+
